@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { AppEntry } from '../types';
-import { ExternalLink, Zap, Bot } from 'lucide-react';
+import { ExternalLink, Zap, Bot, Pencil, Trash2 } from 'lucide-react';
 
 interface AppCardProps {
   app: AppEntry;
   index: number;
+  onEdit: (app: AppEntry) => void;
+  onDelete: (appId: string) => void;
 }
 
-const AppCard: React.FC<AppCardProps> = ({ app }) => {
+const AppCard: React.FC<AppCardProps> = ({ app, onEdit, onDelete }) => {
   const [imageError, setImageError] = useState(false);
 
   const getFaviconUrl = (url: string) => {
@@ -22,7 +24,26 @@ const AppCard: React.FC<AppCardProps> = ({ app }) => {
   const faviconUrl = getFaviconUrl(app.url);
 
   return (
-    <div className="group bg-white rounded-[2rem] p-5 shadow-soft hover:shadow-lg transition-all border border-transparent hover:border-vibe-red/10 flex flex-col gap-4">
+    <div className="group relative bg-white rounded-[2rem] p-5 shadow-soft hover:shadow-lg transition-all border border-transparent hover:border-vibe-red/10 flex flex-col gap-4">
+      
+      {/* Edit/Delete Actions - Visible on Hover */}
+      <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        <button 
+          onClick={(e) => { e.preventDefault(); onEdit(app); }}
+          className="p-2 bg-gray-100 rounded-full text-vibe-dark hover:bg-vibe-teal hover:text-white transition-colors"
+          title="Edit App"
+        >
+          <Pencil size={14} />
+        </button>
+        <button 
+          onClick={(e) => { e.preventDefault(); onDelete(app.id); }}
+          className="p-2 bg-gray-100 rounded-full text-vibe-dark hover:bg-vibe-red hover:text-white transition-colors"
+          title="Delete App"
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+
       <div className="flex items-center gap-4">
         
         {/* Logo Section - Clickable for Main URL */}
@@ -51,7 +72,7 @@ const AppCard: React.FC<AppCardProps> = ({ app }) => {
             href={app.url} 
             target="_blank" 
             rel="noopener noreferrer" 
-            className="flex-grow min-w-0"
+            className="flex-grow min-w-0 pr-16" // Added padding right to avoid overlap with buttons
         >
             <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-vibe-dark truncate pr-2 tracking-tight group-hover:text-vibe-red transition-colors">

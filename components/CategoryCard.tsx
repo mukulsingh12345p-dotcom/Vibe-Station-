@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Sparkles, GraduationCap, LayoutGrid, Layers } from 'lucide-react';
+import { ArrowRight, Sparkles, GraduationCap, LayoutGrid, Layers, Trash2 } from 'lucide-react';
 
 interface CategoryCardProps {
   name: string;
@@ -7,9 +7,10 @@ interface CategoryCardProps {
   onClick: () => void;
   type: 'category' | 'subcategory';
   categoryId?: string;
+  onDelete: () => void;
 }
 
-const CategoryCard: React.FC<CategoryCardProps> = ({ name, count, onClick, type, categoryId }) => {
+const CategoryCard: React.FC<CategoryCardProps> = ({ name, count, onClick, type, categoryId, onDelete }) => {
   const isMain = type === 'category';
 
   // Specific Styling based on Category ID (simulating the images)
@@ -37,7 +38,7 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ name, count, onClick, type,
   return (
     <div 
       onClick={onClick}
-      className="bg-white rounded-[2rem] p-6 shadow-soft hover:shadow-lg transition-all cursor-pointer flex items-center justify-between group active:scale-[0.98]"
+      className="bg-white rounded-[2rem] p-6 shadow-soft hover:shadow-lg transition-all cursor-pointer flex items-center justify-between group active:scale-[0.98] relative"
     >
       <div className="flex items-center gap-5">
         <div className={`w-16 h-16 rounded-[1.2rem] ${getIconBg()} flex items-center justify-center transition-transform group-hover:scale-110`}>
@@ -67,8 +68,18 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ name, count, onClick, type,
         </div>
       </div>
 
-      <div className="text-vibe-red opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all">
-         <ArrowRight size={24} />
+      <div className="flex items-center gap-4">
+          <div className="text-vibe-red opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all">
+             <ArrowRight size={24} />
+          </div>
+
+          <button 
+             onClick={(e) => { e.stopPropagation(); onDelete(); }}
+             className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-vibe-gray hover:bg-vibe-red hover:text-white transition-colors opacity-0 group-hover:opacity-100"
+             title="Delete"
+          >
+             <Trash2 size={16} />
+          </button>
       </div>
     </div>
   );

@@ -30,6 +30,7 @@ const App: React.FC = () => {
   const [isAppModalOpen, setIsAppModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingApp, setEditingApp] = useState<AppEntry | null>(null);
 
   // --- Auth & Data Fetching ---
   useEffect(() => {
@@ -161,41 +162,128 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAddApp = async (newApp: Omit<AppEntry, 'id' | 'createdAt'>) => {
+  const handleSaveApp = async (appData: Omit<AppEntry, 'id' | 'createdAt'>) => {
       try {
-        const { data, error } = await supabase
-            .from('apps')
-            .insert({
-                name: newApp.name,
-                url: newApp.url,
-                ai_studio_url: newApp.aiStudioUrl,
-                description: newApp.description,
-                category_id: newApp.categoryId,
-                sub_category_id: newApp.subCategoryId,
-                created_at: Date.now()
-            })
-            .select()
-            .single();
+        if (editingApp) {
+            // Update Existing App
+            const { data, error } = await supabase
+                .from('apps')
+                .update({
+                    name: appData.name,
+                    url: appData.url,
+                    ai_studio_url: appData.aiStudioUrl,
+                    description: appData.description,
+                    category_id: appData.categoryId,
+                    sub_category_id: appData.subCategoryId
+                })
+                .eq('id', editingApp.id)
+                .select()
+                .single();
 
-        if (error) throw error;
+            if (error) throw error;
 
-        if (data) {
-            const app: AppEntry = { 
-                id: data.id,
-                name: data.name,
-                url: data.url,
-                aiStudioUrl: data.ai_studio_url,
-                description: data.description,
-                categoryId: data.category_id,
-                subCategoryId: data.sub_category_id,
-                createdAt: Number(data.created_at)
-            };
-            setApps(prev => [app, ...prev]);
+            if (data) {
+                setApps(prev => prev.map(a => a.id === editingApp.id ? {
+                    ...a,
+                    name: data.name,
+                    url: data.url,
+                    aiStudioUrl: data.ai_studio_url,
+                    description: data.description,
+                    categoryId: data.category_id,
+                    subCategoryId: data.sub_category_id
+                } : a));
+            }
+        } else {
+            // Create New App
+            const { data, error } = await supabase
+                .from('apps')
+                .insert({
+                    name: appData.name,
+                    url: appData.url,
+                    ai_studio_url: appData.aiStudioUrl,
+                    description: appData.description,
+                    category_id: appData.categoryId,
+                    sub_category_id: appData.subCategoryId,
+                    created_at: Date.now()
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            if (data) {
+                const app: AppEntry = { 
+                    id: data.id,
+                    name: data.name,
+                    url: data.url,
+                    aiStudioUrl: data.ai_studio_url,
+                    description: data.description,
+                    categoryId: data.category_id,
+                    subCategoryId: data.sub_category_id,
+                    createdAt: Number(data.created_at)
+                };
+                setApps(prev => [app, ...prev]);
+            }
         }
       } catch (e) {
-        console.error("Error adding app:", e);
+        console.error("Error saving app:", e);
         alert("Failed to save app. Check console.");
       }
+  };
+
+  const handleEditApp = (app: AppEntry) => {
+    setEditingApp(app);
+    setIsAppModalOpen(true);
+  };
+
+  const handleDeleteApp = async (appId: string) => {
+    if (!window.confirm("Are you sure you want to delete this app?")) return;
+    try {
+        const { error } = await supabase.from('apps').delete().eq('id', appId);
+        if (error) throw error;
+        setApps(prev => prev.filter(a => a.id !== appId));
+    } catch (e) {
+        console.error("Error deleting app:", e);
+        alert("Failed to delete app.");
+    }
+  };
+
+  const handleDeleteCategory = async (catId: string) => {
+     if (!window.confirm("Are you sure? This will delete the category AND all apps inside it.")) return;
+     try {
+         const { error } = await supabase.from('categories').delete().eq('id', catId);
+         if (error) throw error;
+         setCategories(prev => prev.filter(c => c.id !== catId));
+         // If we are currently in this category, go home
+         if (viewState.type === 'CATEGORY' && viewState.categoryId === catId) {
+             setViewState({ type: 'HOME' });
+         }
+     } catch (e) {
+        console.error("Error deleting category:", e);
+        alert("Failed to delete category.");
+     }
+  };
+
+  const handleDeleteSubCategory = async (subId: string) => {
+     if (!window.confirm("Are you sure? This will delete the sub-category AND all apps inside it.")) return;
+     try {
+         const { error } = await supabase.from('sub_categories').delete().eq('id', subId);
+         if (error) throw error;
+         
+         // Update local state
+         setCategories(prev => prev.map(c => ({
+             ...c,
+             subCategories: c.subCategories.filter(sc => sc.id !== subId)
+         })));
+
+         // If we are currently in this subcategory, go back to category
+         if (viewState.type === 'SUBCATEGORY' && viewState.subCategoryId === subId) {
+             setViewState({ type: 'CATEGORY', categoryId: viewState.categoryId });
+         }
+     } catch (e) {
+        console.error("Error deleting sub-category:", e);
+        alert("Failed to delete sub-category.");
+     }
   };
 
   // --- Navigation Helpers ---
@@ -345,7 +433,10 @@ const App: React.FC = () => {
                     {(viewState.type === 'HOME' || viewState.type === 'CATEGORY' || viewState.type === 'SUBCATEGORY') && (
                         <button 
                           onClick={() => {
-                              if (viewState.type === 'SUBCATEGORY') setIsAppModalOpen(true);
+                              if (viewState.type === 'SUBCATEGORY') {
+                                setEditingApp(null);
+                                setIsAppModalOpen(true);
+                              }
                               else setIsCategoryModalOpen(true);
                           }}
                           className="w-14 h-14 bg-vibe-red rounded-[1.2rem] shadow-glow flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all z-20"
@@ -382,7 +473,13 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {(displayedContent as AppEntry[]).length > 0 ? (
                         (displayedContent as AppEntry[]).map((app, index) => (
-                            <AppCard key={app.id} app={app} index={index} />
+                            <AppCard 
+                                key={app.id} 
+                                app={app} 
+                                index={index} 
+                                onEdit={handleEditApp}
+                                onDelete={handleDeleteApp}
+                            />
                         ))
                     ) : (
                         searchTerm ? (
@@ -409,7 +506,7 @@ const App: React.FC = () => {
                     </div>
                     <div className="flex gap-3">
                         <button 
-                            onClick={() => setIsAppModalOpen(true)}
+                            onClick={() => { setEditingApp(null); setIsAppModalOpen(true); }}
                             className="flex items-center gap-2 bg-vibe-teal text-white px-5 py-3 rounded-xl font-bold uppercase tracking-wider text-[10px] shadow-lg hover:bg-vibe-teal/90 transition-colors"
                         >
                             <Plus size={14} /> New App
@@ -420,13 +517,19 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {(displayedContent as AppEntry[]).length > 0 ? (
                          (displayedContent as AppEntry[]).map((app, index) => (
-                             <AppCard key={app.id} app={app} index={index} />
+                             <AppCard 
+                                key={app.id} 
+                                app={app} 
+                                index={index}
+                                onEdit={handleEditApp}
+                                onDelete={handleDeleteApp}
+                             />
                          ))
                     ) : (
                          <div className="col-span-full py-12 flex flex-col items-center justify-center text-vibe-gray/40">
                              <LayoutGrid size={48} className="mb-4 opacity-50" />
                              <p className="font-bold text-sm">No apps found.</p>
-                             <button onClick={() => setIsAppModalOpen(true)} className="mt-2 text-vibe-teal font-bold text-xs uppercase tracking-wider hover:underline">Add Your First App</button>
+                             <button onClick={() => { setEditingApp(null); setIsAppModalOpen(true); }} className="mt-2 text-vibe-teal font-bold text-xs uppercase tracking-wider hover:underline">Add Your First App</button>
                         </div>
                     )}
                 </div>
@@ -449,7 +552,7 @@ const App: React.FC = () => {
                             <p className="text-vibe-gray text-sm font-medium">Group Content</p>
                         </div>
                         <button 
-                            onClick={() => setIsAppModalOpen(true)}
+                            onClick={() => { setEditingApp(null); setIsAppModalOpen(true); }}
                             className="flex items-center gap-2 bg-vibe-dark text-white px-5 py-3 rounded-xl font-bold uppercase tracking-wider text-xs shadow-lg hover:bg-black transition-colors"
                         >
                             <Plus size={16} /> Add App
@@ -468,13 +571,19 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {(displayedContent as AppEntry[]).length > 0 ? (
                         (displayedContent as AppEntry[]).map((app, index) => (
-                            <AppCard key={app.id} app={app} index={index} />
+                            <AppCard 
+                                key={app.id} 
+                                app={app} 
+                                index={index} 
+                                onEdit={handleEditApp}
+                                onDelete={handleDeleteApp}
+                            />
                         ))
                     ) : (
                         <div className="col-span-full py-12 flex flex-col items-center justify-center text-vibe-gray/40">
                              <LayoutGrid size={48} className="mb-4 opacity-50" />
                              <p className="font-bold text-sm">No apps in this group yet.</p>
-                             <button onClick={() => setIsAppModalOpen(true)} className="mt-2 text-vibe-teal font-bold text-xs uppercase tracking-wider hover:underline">Add First App</button>
+                             <button onClick={() => { setEditingApp(null); setIsAppModalOpen(true); }} className="mt-2 text-vibe-teal font-bold text-xs uppercase tracking-wider hover:underline">Add First App</button>
                         </div>
                     )}
                 </div>
@@ -509,6 +618,7 @@ const App: React.FC = () => {
                         categoryId={cat.id} 
                         count={cat.subCategories.length}
                         onClick={() => { setViewState({ type: 'CATEGORY', categoryId: cat.id }); setSearchTerm(''); }}
+                        onDelete={() => handleDeleteCategory(cat.id)}
                     />
                 ))}
 
@@ -519,11 +629,18 @@ const App: React.FC = () => {
                         type="subcategory"
                         count={apps.filter(a => a.subCategoryId === sub.id).length}
                         onClick={() => { setViewState({ type: 'SUBCATEGORY', categoryId: viewState.categoryId, subCategoryId: sub.id }); setSearchTerm(''); }}
+                        onDelete={() => handleDeleteSubCategory(sub.id)}
                     />
                 ))}
 
                 {viewState.type === 'SUBCATEGORY' && (displayedContent as AppEntry[]).map((app, index) => (
-                    <AppCard key={app.id} app={app} index={index} />
+                    <AppCard 
+                        key={app.id} 
+                        app={app} 
+                        index={index} 
+                        onEdit={handleEditApp}
+                        onDelete={handleDeleteApp}
+                    />
                 ))}
             </div>
         )}
@@ -568,7 +685,7 @@ const App: React.FC = () => {
       <AddAppModal 
         isOpen={isAppModalOpen} 
         onClose={() => setIsAppModalOpen(false)} 
-        onAdd={handleAddApp} 
+        onSave={handleSaveApp} 
         categories={categories}
         initialCategoryId={
             viewState.type === 'SUBCATEGORY' ? viewState.categoryId : 
@@ -578,6 +695,7 @@ const App: React.FC = () => {
             viewState.type === 'SUBCATEGORY' ? viewState.subCategoryId : 
             viewState.type === 'GRID_GROUP' ? categories.find(c => c.id === viewState.groupId)?.subCategories[0]?.id : undefined
         }
+        initialData={editingApp}
       />
       <AddCategoryModal
         isOpen={isCategoryModalOpen}
