@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, ChevronRight, Home, Grid, LogOut, Sparkles, GraduationCap, LayoutGrid, ArrowLeft, FolderPlus, Layers } from 'lucide-react';
+import { Plus, Search, ChevronRight, Home, Grid, LogOut, LayoutGrid, ArrowLeft, FolderPlus } from 'lucide-react';
+import { supabase } from './services/supabaseClient';
 import { AppEntry, Category } from './types';
 import AppCard from './components/AppCard';
 import CategoryCard from './components/CategoryCard';
@@ -7,7 +8,6 @@ import AddAppModal from './components/AddAppModal';
 import AddCategoryModal from './components/AddCategoryModal';
 import LoginScreen from './components/LoginScreen';
 import Logo from './components/Logo';
-import { supabase } from './services/supabaseClient';
 
 // View State Management
 type ViewState = 
@@ -20,81 +20,83 @@ type ViewState =
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  
+  // State
   const [apps, setApps] = useState<AppEntry[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [viewState, setViewState] = useState<ViewState>({ type: 'HOME' });
   const [isAppModalOpen, setIsAppModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
 
-  // --- Auth & Initial Load ---
+  // --- Auth & Data Fetching ---
   useEffect(() => {
     const authSession = localStorage.getItem('def_auth_session');
-    if (authSession === 'true') setIsAuthenticated(true);
+    if (authSession === 'true') {
+        setIsAuthenticated(true);
+        fetchData();
+    } else {
+        setLoading(false);
+    }
   }, []);
 
-  // --- Fetch Data from Supabase ---
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setIsLoading(true);
-        
-        // 1. Fetch Categories
-        const { data: catData, error: catError } = await supabase.from('categories').select('*');
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+        // Fetch Categories and SubCategories
+        const { data: catsData, error: catError } = await supabase
+            .from('categories')
+            .select('*, sub_categories(*)');
+
         if (catError) console.error('Error fetching categories:', catError);
 
-        // 2. Fetch SubCategories
-        const { data: subCatData, error: subError } = await supabase.from('sub_categories').select('*');
-        if (subError) console.error('Error fetching subcategories:', subError);
+        if (catsData) {
+            const formattedCats: Category[] = catsData.map((c: any) => ({
+                id: c.id,
+                name: c.name,
+                subCategories: (c.sub_categories || []).map((sc: any) => ({
+                    id: sc.id,
+                    name: sc.name
+                }))
+            }));
+            setCategories(formattedCats);
+        }
 
-        // 3. Fetch Apps
-        const { data: appData, error: appError } = await supabase.from('apps').select('*');
+        // Fetch Apps
+        const { data: appsData, error: appError } = await supabase
+            .from('apps')
+            .select('*');
+        
         if (appError) console.error('Error fetching apps:', appError);
 
-        // Merge Data
-        if (catData && subCatData) {
-            const mergedCategories: Category[] = catData.map((cat: any) => ({
-                id: cat.id,
-                name: cat.name,
-                subCategories: subCatData
-                    .filter((sub: any) => sub.category_id === cat.id)
-                    .map((sub: any) => ({
-                        id: sub.id,
-                        name: sub.name
-                    }))
+        if (appsData) {
+            const formattedApps: AppEntry[] = appsData.map((a: any) => ({
+                id: a.id,
+                name: a.name,
+                url: a.url,
+                aiStudioUrl: a.ai_studio_url,
+                description: a.description,
+                categoryId: a.category_id,
+                subCategoryId: a.sub_category_id,
+                createdAt: Number(a.created_at)
             }));
-            setCategories(mergedCategories);
+            setApps(formattedApps);
         }
 
-        if (appData) {
-            // Map snake_case DB columns to camelCase AppEntry interface
-            const mappedApps: AppEntry[] = appData.map((app: any) => ({
-                id: app.id,
-                name: app.name,
-                url: app.url,
-                description: app.description,
-                categoryId: app.category_id,
-                subCategoryId: app.sub_category_id,
-                createdAt: app.created_at
-            }));
-            setApps(mappedApps);
-        }
-
-      } catch (error) {
-        console.error("System Error:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadData();
-  }, []);
+    } catch (e) {
+        console.error("Connection error:", e);
+    } finally {
+        setLoading(false);
+    }
+  };
 
   // --- Handlers ---
   const handleLogin = () => {
     localStorage.setItem('def_auth_session', 'true');
     setIsAuthenticated(true);
+    fetchData();
   };
 
   const handleLogout = () => {
@@ -103,69 +105,97 @@ const App: React.FC = () => {
   };
 
   const handleAddCategory = async (name: string) => {
-    const id = crypto.randomUUID();
-    
-    // HOME or GRID view -> Create a new Main Category
-    if (viewState.type === 'HOME' || viewState.type === 'GRID') {
-       // Optimistic UI Update
-       const newCategory: Category = { 
-           id, 
-           name, 
-           subCategories: [] 
-       };
-       setCategories(prev => [...prev, newCategory]);
-       
-       // DB Insert
-       await supabase.from('categories').insert({ id, name });
-       
-       // If in GRID mode, we usually added a default 'Main' subcategory locally.
-       if (viewState.type === 'GRID') {
-           const subId = crypto.randomUUID();
-           const newSub = { id: subId, name: 'Main' };
-           setCategories(prev => prev.map(c => c.id === id ? { ...c, subCategories: [newSub] } : c));
-           await supabase.from('sub_categories').insert({ id: subId, category_id: id, name: 'Main' });
-       }
+    try {
+        // HOME or GRID view -> Create a new Main Category
+        if (viewState.type === 'HOME' || viewState.type === 'GRID') {
+            const { data, error } = await supabase
+                .from('categories')
+                .insert({ name: name, created_at: Date.now() })
+                .select()
+                .single();
+            
+            if (error) throw error;
+            if (data) {
+                const newCat: Category = { id: data.id, name: data.name, subCategories: [] };
+                setCategories(prev => [...prev, newCat]);
+                
+                // If in GRID mode, add a default 'Main' subcategory automatically
+                if (viewState.type === 'GRID') {
+                    const { data: subData } = await supabase
+                        .from('sub_categories')
+                        .insert({ name: 'Main', category_id: data.id, created_at: Date.now() })
+                        .select()
+                        .single();
+                    
+                    if (subData) {
+                        setCategories(prev => prev.map(c => c.id === data.id ? { ...c, subCategories: [{ id: subData.id, name: subData.name }] } : c));
+                    }
+                }
+            }
 
-    } else if (viewState.type === 'CATEGORY') {
-       // CATEGORY view -> Create a new Sub-Category
-       const newSubCat = { id, name };
-       
-       // Optimistic UI
-       setCategories(prev => prev.map(cat => {
-         if (cat.id === viewState.categoryId) {
-           return { ...cat, subCategories: [...cat.subCategories, newSubCat] };
-         }
-         return cat;
-       }));
+        } else if (viewState.type === 'CATEGORY') {
+            // CATEGORY view -> Create a new Sub-Category
+            const { data, error } = await supabase
+                .from('sub_categories')
+                .insert({ 
+                    name: name, 
+                    category_id: viewState.categoryId,
+                    created_at: Date.now() 
+                })
+                .select()
+                .single();
 
-       // DB Insert
-       await supabase.from('sub_categories').insert({ 
-           id, 
-           category_id: viewState.categoryId, 
-           name 
-       });
+            if (error) throw error;
+            if (data) {
+                setCategories(prev => prev.map(cat => {
+                    if (cat.id === viewState.categoryId) {
+                        return { ...cat, subCategories: [...cat.subCategories, { id: data.id, name: data.name }] };
+                    }
+                    return cat;
+                }));
+            }
+        }
+    } catch (e) {
+        console.error("Error adding category:", e);
+        alert("Failed to save category. Check console.");
     }
   };
 
   const handleAddApp = async (newApp: Omit<AppEntry, 'id' | 'createdAt'>) => {
-    const id = crypto.randomUUID();
-    const createdAt = Date.now();
-    const app: AppEntry = { ...newApp, id, createdAt };
+      try {
+        const { data, error } = await supabase
+            .from('apps')
+            .insert({
+                name: newApp.name,
+                url: newApp.url,
+                ai_studio_url: newApp.aiStudioUrl,
+                description: newApp.description,
+                category_id: newApp.categoryId,
+                sub_category_id: newApp.subCategoryId,
+                created_at: Date.now()
+            })
+            .select()
+            .single();
 
-    // Optimistic UI
-    setApps(prev => [app, ...prev]);
+        if (error) throw error;
 
-    // DB Insert
-    // We map camelCase (App) to snake_case (DB) here
-    await supabase.from('apps').insert({
-        id,
-        name: app.name,
-        url: app.url,
-        description: app.description,
-        category_id: app.categoryId,
-        sub_category_id: app.subCategoryId,
-        created_at: app.createdAt
-    });
+        if (data) {
+            const app: AppEntry = { 
+                id: data.id,
+                name: data.name,
+                url: data.url,
+                aiStudioUrl: data.ai_studio_url,
+                description: data.description,
+                categoryId: data.category_id,
+                subCategoryId: data.sub_category_id,
+                createdAt: Number(data.created_at)
+            };
+            setApps(prev => [app, ...prev]);
+        }
+      } catch (e) {
+        console.error("Error adding app:", e);
+        alert("Failed to save app. Check console.");
+      }
   };
 
   // --- Navigation Helpers ---
@@ -235,6 +265,18 @@ const App: React.FC = () => {
 
   // --- Render ---
   if (!isAuthenticated) return <LoginScreen onLogin={handleLogin} />;
+  
+  // Simple loading state
+  if (loading && apps.length === 0 && categories.length === 0) {
+      return (
+          <div className="min-h-screen bg-[#F8F9FB] flex items-center justify-center">
+              <div className="animate-pulse flex flex-col items-center">
+                  <div className="w-12 h-12 bg-vibe-red rounded-full mb-4"></div>
+                  <div className="text-vibe-gray font-bold text-xs uppercase tracking-widest">Loading Database...</div>
+              </div>
+          </div>
+      );
+  }
 
   return (
     <div className="min-h-screen bg-[#F8F9FB] flex flex-col font-sans text-vibe-dark selection:bg-vibe-red/20">
@@ -366,12 +408,6 @@ const App: React.FC = () => {
                         <p className="text-vibe-gray text-sm font-medium">All Applications</p>
                     </div>
                     <div className="flex gap-3">
-                         <button 
-                            onClick={() => setIsCategoryModalOpen(true)}
-                            className="flex items-center gap-2 bg-white text-vibe-dark px-4 py-3 rounded-xl font-bold uppercase tracking-wider text-[10px] shadow-soft hover:bg-gray-50 transition-colors"
-                        >
-                            <FolderPlus size={14} /> New Group
-                        </button>
                         <button 
                             onClick={() => setIsAppModalOpen(true)}
                             className="flex items-center gap-2 bg-vibe-teal text-white px-5 py-3 rounded-xl font-bold uppercase tracking-wider text-[10px] shadow-lg hover:bg-vibe-teal/90 transition-colors"
@@ -397,7 +433,7 @@ const App: React.FC = () => {
              </div>
         )}
 
-        {/* GRID GROUP VIEW - Kept for internal routing consistency, though less accessible from main grid now */}
+        {/* GRID GROUP VIEW - Kept for internal routing consistency */}
         {viewState.type === 'GRID_GROUP' && currentCategory && (
             <div className="animate-slide-up">
                 <div className="mb-8">
@@ -471,7 +507,6 @@ const App: React.FC = () => {
                         name={cat.name} 
                         type="category"
                         categoryId={cat.id} 
-                        // Pass subcategory count
                         count={cat.subCategories.length}
                         onClick={() => { setViewState({ type: 'CATEGORY', categoryId: cat.id }); setSearchTerm(''); }}
                     />
@@ -548,7 +583,6 @@ const App: React.FC = () => {
         isOpen={isCategoryModalOpen}
         onClose={() => setIsCategoryModalOpen(false)}
         onAdd={handleAddCategory}
-        // If we are in HOME or GRID, we are creating a Main Category. Else Sub-Category.
         type={viewState.type === 'HOME' || viewState.type === 'GRID' ? 'Category' : 'Sub-Category'}
         parentName={viewState.type === 'CATEGORY' ? currentCategory?.name : undefined}
       />

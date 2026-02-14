@@ -21,6 +21,7 @@ const AddAppModal: React.FC<AddAppModalProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
+  const [aiStudioUrl, setAiStudioUrl] = useState('');
   const [description, setDescription] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [selectedSubCategoryId, setSelectedSubCategoryId] = useState('');
@@ -31,6 +32,7 @@ const AddAppModal: React.FC<AddAppModalProps> = ({
       setSelectedSubCategoryId(initialSubCategoryId || '');
       setName('');
       setUrl('');
+      setAiStudioUrl('');
       setDescription('');
     }
   }, [isOpen, initialCategoryId, initialSubCategoryId]);
@@ -53,6 +55,7 @@ const AddAppModal: React.FC<AddAppModalProps> = ({
     onAdd({
       name,
       url: url.startsWith('http') ? url : `https://${url}`,
+      aiStudioUrl: aiStudioUrl ? (aiStudioUrl.startsWith('http') ? aiStudioUrl : `https://${aiStudioUrl}`) : undefined,
       description: description,
       categoryId: selectedCategoryId,
       subCategoryId: selectedSubCategoryId
@@ -64,8 +67,8 @@ const AddAppModal: React.FC<AddAppModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-white/60 backdrop-blur-md animate-fade-in">
-      <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden animate-slide-up border border-gray-100">
-        <div className="flex justify-between items-center p-6 border-b border-gray-100">
+      <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden animate-slide-up border border-gray-100 max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center p-6 border-b border-gray-100 sticky top-0 bg-white z-10">
           <h2 className="text-xl font-black italic text-vibe-dark">NEW UNIT</h2>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-vibe-dark hover:bg-vibe-red hover:text-white transition-colors">
             <X size={16} />
@@ -86,7 +89,7 @@ const AddAppModal: React.FC<AddAppModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-widest text-vibe-gray mb-2 ml-1">URL</label>
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-vibe-gray mb-2 ml-1">Website URL</label>
             <input
               type="text"
               required
@@ -94,6 +97,17 @@ const AddAppModal: React.FC<AddAppModalProps> = ({
               onChange={(e) => setUrl(e.target.value)}
               className="w-full bg-[#F8F9FB] rounded-xl px-4 py-3 text-vibe-dark font-bold outline-none focus:ring-2 focus:ring-vibe-teal/20 transition-all"
               placeholder="https://..."
+            />
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-vibe-gray mb-2 ml-1">AI Studio Link (Optional)</label>
+            <input
+              type="text"
+              value={aiStudioUrl}
+              onChange={(e) => setAiStudioUrl(e.target.value)}
+              className="w-full bg-[#F8F9FB] rounded-xl px-4 py-3 text-vibe-dark font-bold outline-none focus:ring-2 focus:ring-vibe-teal/20 transition-all"
+              placeholder="https://aistudio.google.com/..."
             />
           </div>
 

@@ -13,6 +13,7 @@ export interface AppEntry {
   id: string;
   name: string;
   url: string;
+  aiStudioUrl?: string;
   description: string;
   categoryId: string;
   subCategoryId: string;

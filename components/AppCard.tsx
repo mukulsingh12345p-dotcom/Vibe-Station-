@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { AppEntry } from '../types';
-import { ExternalLink, Zap } from 'lucide-react';
-import Logo from './Logo';
+import { ExternalLink, Zap, Bot } from 'lucide-react';
 
 interface AppCardProps {
   app: AppEntry;
@@ -23,16 +22,16 @@ const AppCard: React.FC<AppCardProps> = ({ app }) => {
   const faviconUrl = getFaviconUrl(app.url);
 
   return (
-    <a 
-        href={app.url} 
-        target="_blank" 
-        rel="noopener noreferrer"
-        className="group block bg-white rounded-[2rem] p-5 shadow-soft hover:shadow-lg transition-all active:scale-[0.98] border border-transparent hover:border-vibe-red/10"
-    >
+    <div className="group bg-white rounded-[2rem] p-5 shadow-soft hover:shadow-lg transition-all border border-transparent hover:border-vibe-red/10 flex flex-col gap-4">
       <div className="flex items-center gap-4">
         
-        {/* Logo Section */}
-        <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-vibe-light flex items-center justify-center overflow-hidden group-hover:scale-105 transition-transform">
+        {/* Logo Section - Clickable for Main URL */}
+        <a 
+            href={app.url} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex-shrink-0 w-14 h-14 rounded-2xl bg-vibe-light flex items-center justify-center overflow-hidden hover:scale-105 transition-transform"
+        >
            {!imageError && faviconUrl ? (
              <img 
                src={faviconUrl} 
@@ -45,23 +44,52 @@ const AppCard: React.FC<AppCardProps> = ({ app }) => {
                <Zap size={20} />
              </div>
            )}
-        </div>
+        </a>
 
-        {/* Text Content */}
-        <div className="flex-grow min-w-0">
+        {/* Text Content - Clickable for Main URL */}
+        <a 
+            href={app.url} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="flex-grow min-w-0"
+        >
             <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-vibe-dark truncate pr-2 tracking-tight group-hover:text-vibe-red transition-colors">
                     {app.name}
                 </h3>
-                <ExternalLink size={16} className="text-vibe-gray/40 group-hover:text-vibe-red transition-colors" />
             </div>
             
             <p className="text-xs font-medium text-vibe-gray truncate mt-0.5">
                 {app.description || 'Launch Application'}
             </p>
-        </div>
+        </a>
       </div>
-    </a>
+
+      {/* Action Buttons */}
+      <div className="flex gap-3 pt-1">
+          <a 
+            href={app.url} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex-1 bg-gray-50 text-vibe-dark hover:bg-vibe-dark hover:text-white transition-colors rounded-xl py-3 px-4 flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wider group/btn"
+          >
+             Open App
+             <ExternalLink size={14} className="opacity-50 group-hover/btn:opacity-100" />
+          </a>
+
+          {app.aiStudioUrl && (
+              <a 
+                href={app.aiStudioUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                title="Open in AI Studio"
+                className="w-12 bg-vibe-teal/10 text-vibe-teal hover:bg-vibe-teal hover:text-white transition-colors rounded-xl flex items-center justify-center"
+              >
+                 <Bot size={18} />
+              </a>
+          )}
+      </div>
+    </div>
   );
 };
 
