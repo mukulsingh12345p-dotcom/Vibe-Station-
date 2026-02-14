@@ -8,15 +8,18 @@ interface IconDisplayProps extends LucideProps {
 
 const IconDisplay: React.FC<IconDisplayProps> = ({ name, ...props }) => {
   // Access the icon component dynamically from the namespace import
-  // @ts-ignore - Indexing into the namespace object
-  const IconComponent = Icons[name as keyof typeof Icons];
+  // The namespace import includes utility functions like createLucideIcon, so we cast to any first
+  const IconComponent = (Icons as any)[name];
 
   if (!IconComponent) {
     // Fallback icon if the name is invalid
     return <Icons.Globe {...props} />;
   }
 
-  return <IconComponent {...props} />;
+  // Cast to ElementType to satisfy JSX requirements
+  const ValidIcon = IconComponent as React.ElementType;
+
+  return <ValidIcon {...props} />;
 };
 
 export default IconDisplay;
