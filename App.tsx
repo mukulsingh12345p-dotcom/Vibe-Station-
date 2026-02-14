@@ -156,9 +156,9 @@ const App: React.FC = () => {
                 }));
             }
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error("Error adding category:", e);
-        alert("Failed to save category. Check console.");
+        alert(`Failed to save category: ${e.message || "Check console."}`);
     }
   };
 
@@ -225,9 +225,9 @@ const App: React.FC = () => {
                 setApps(prev => [app, ...prev]);
             }
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error("Error saving app:", e);
-        alert("Failed to save app. Check console.");
+        alert(`Failed to save app: ${e.message || "Check console."}`);
       }
   };
 
@@ -242,9 +242,9 @@ const App: React.FC = () => {
         const { error } = await supabase.from('apps').delete().eq('id', appId);
         if (error) throw error;
         setApps(prev => prev.filter(a => a.id !== appId));
-    } catch (e) {
+    } catch (e: any) {
         console.error("Error deleting app:", e);
-        alert("Failed to delete app.");
+        alert(`Failed to delete app: ${e.message || "Check console."}`);
     }
   };
 
@@ -258,9 +258,9 @@ const App: React.FC = () => {
          if (viewState.type === 'CATEGORY' && viewState.categoryId === catId) {
              setViewState({ type: 'HOME' });
          }
-     } catch (e) {
+     } catch (e: any) {
         console.error("Error deleting category:", e);
-        alert("Failed to delete category.");
+        alert(`Failed to delete category: ${e.message || "Check console."}`);
      }
   };
 
@@ -280,9 +280,9 @@ const App: React.FC = () => {
          if (viewState.type === 'SUBCATEGORY' && viewState.subCategoryId === subId) {
              setViewState({ type: 'CATEGORY', categoryId: viewState.categoryId });
          }
-     } catch (e) {
+     } catch (e: any) {
         console.error("Error deleting sub-category:", e);
-        alert("Failed to delete sub-category.");
+        alert(`Failed to delete sub-category: ${e.message || "Check console."}`);
      }
   };
 
