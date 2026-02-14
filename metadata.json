@@ -1,0 +1,5 @@
+{
+  "name": "DEF Applications",
+  "description": "A centralized dashboard to manage and launch all your Vercel-deployed applications in one place.",
+  "requestFramePermissions": []
+}
